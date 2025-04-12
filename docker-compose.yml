@@ -1,0 +1,435 @@
+---
+
+# Setup default propreties we want on all/most containers
+x-default-container: &default-container
+  # user: 1000:1000
+  environment:
+    - PUID=1000 
+    - PGID=1000 
+    - TZ=Europe/Berlin
+  networks:
+    - traefik  
+  deploy:
+    mode: replicated
+    replicas: 1
+
+services:
+  bazarr: 
+    <<: *default-container
+    image: lscr.io/linuxserver/bazarr:latest 
+    volumes: 
+      - /home/docker/mnt/fast/mediarr_data/bazarr/config:/config 
+      - myMedia:/mnt/media 
+      - myDlFolders:/mnt/downloads 
+    # ports: 
+    #   - 6767:6767
+    # depends_on: 
+    #   - sonarr 
+    #   - radarr 
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.stack.network=traefik"  
+
+        - "traefik.http.routers.bazarr.rule=Host(`bazarr.hartig.es`)"
+        - "traefik.http.routers.bazarr.entrypoints=https"
+        - "traefik.http.routers.bazarr.tls=true"
+
+        - "traefik.http.services.bazarr.loadbalancer.server.port=6767"
+
+        # - "traefik.constraint=proxy-public"
+  overseerr:
+    <<: *default-container
+    image: lscr.io/linuxserver/overseerr:latest
+    # ports:
+    #   - "5055:5055"
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.stack.network=traefik"  
+
+        - "traefik.http.routers.overseerr.rule=Host(`overseerr.hartig.es`)"
+        - "traefik.http.routers.overseerr.entrypoints=https"
+        - "traefik.http.routers.overseerr.tls=true"
+
+        - "traefik.http.services.overseerr.loadbalancer.server.port=5055"
+
+        # - "traefik.constraint=proxy-public"
+    volumes:
+      - /home/docker/mnt/fast/mediarr_data/overseer/config:/config
+      - myMedia:/mnt/media 
+      - myDlFolders:/mnt/downloads 
+    environment:
+      - PUID=1000 
+      - PGID=1000 
+      - TZ=Europe/Berlin
+      - LOG_LEVEL=${LOG_LEVEL:-info} 
+  prowlarr: 
+    <<: *default-container
+    image: linuxserver/prowlarr:latest 
+    volumes: 
+      - /home/docker/mnt/fast/mediarr_data/prowlarr/config:/config 
+      - myMedia:/mnt/media 
+      - myDlFolders:/mnt/downloads 
+    # ports: 
+    #   - 9696:9696 
+    # depends_on: 
+    #   - flaresolverr 
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.stack.network=traefik"  
+
+        - "traefik.http.routers.prowlarr.rule=Host(`prowlarr.hartig.es`)"
+        - "traefik.http.routers.prowlarr.entrypoints=https"
+        - "traefik.http.routers.prowlarr.tls=true"
+
+        - "traefik.http.services.prowlarr.loadbalancer.server.port=9696"
+
+        # - "traefik.constraint=proxy-public"
+  flaresolverr: 
+    <<: *default-container
+    image: ghcr.io/flaresolverr/flaresolverr:latest 
+    volumes:
+      - myMedia:/mnt/media 
+      - myDlFolders:/mnt/downloads 
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.stack.network=traefik"  
+
+        - "traefik.http.routers.flaresolverr.rule=Host(`flaresolverr.hartig.es`)"
+        - "traefik.http.routers.flaresolverr.entrypoints=https"
+        - "traefik.http.routers.flaresolverr.tls=true"
+
+        - "traefik.http.services.flaresolverr.loadbalancer.server.port=8191"
+
+        # - "traefik.constraint=proxy-public"
+    environment: 
+      - PUID=1000 
+      - PGID=1000 
+      - TZ=Europe/Berlin
+      - LOG_LEVEL=${LOG_LEVEL:-info} 
+      - LOG_HTML=${LOG_HTML:-false} 
+      - CAPTCHA_SOLVER=${CAPTCHA_SOLVER:-none} 
+  # qbittorrent: 
+  #   <<: *default-container
+  #   image: lscr.io/linuxserver/qbittorrent:latest 
+  #   environment:
+      # - PUID=1000 
+      # - PGID=1000 
+      # - TZ=Europe/Berlin
+  #     - WEBUI_PORT=8080 
+  #   volumes: 
+  #     - /home/docker/mnt/fast/mediarr_data/qbittorrent/config:/config
+  #   ports: 
+  #     - 8080:8080 
+  #     - 6881:6881 
+  #     - 6881:6881/udp 
+  lidarr:
+    <<: *default-container
+    image: lscr.io/linuxserver/lidarr:latest
+    volumes:
+      - myMedia:/mnt/media 
+      - myDlFolders:/mnt/downloads 
+      - /home/docker/mnt/fast/mediarr_data/lidarr/config:/config
+      - /home/docker/mnt/fast/mediarr_data/lidarr/custom-services.d:/custom-services.d
+      - /home/docker/mnt/fast/mediarr_data/lidarr/custom-cont-init.d:/custom-cont-init.d
+    # ports:
+    #   - 8686:8686
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.stack.network=traefik"  
+
+        - "traefik.http.routers.lidarr.rule=Host(`lidarr.hartig.es`)"
+        - "traefik.http.routers.lidarr.entrypoints=https"
+        - "traefik.http.routers.lidarr.tls=true"
+
+        - "traefik.http.services.lidarr.loadbalancer.server.port=8686"
+
+        # - "traefik.constraint=proxy-public"
+  radarr: 
+    <<: *default-container
+    image: lscr.io/linuxserver/radarr:latest 
+    volumes: 
+      - myMedia:/mnt/media 
+      - myDlFolders:/mnt/downloads 
+      - /home/docker/mnt/fast/mediarr_data/radarr/config:/config
+      - /home/docker/mnt/fast/mediarr_data/radarr/custom-services.d:/custom-services.d
+      - /home/docker/mnt/fast/mediarr_data/radarr/custom-cont-init.d:/custom-cont-init.d
+    # ports: 
+    #   - 7878:7878 
+    # depends_on: 
+    #   - prowlarr 
+    #   # - qbittorrent 
+    #   - jellyfin 
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.stack.network=traefik"  
+
+        - "traefik.http.routers.radarr.rule=Host(`radarr.hartig.es`)"
+        - "traefik.http.routers.radarr.entrypoints=https"
+        - "traefik.http.routers.radarr.tls=true"
+
+        - "traefik.http.services.radarr.loadbalancer.server.port=7878"
+
+        # - "traefik.constraint=proxy-public"
+  readarr: 
+    <<: *default-container
+    image: lscr.io/linuxserver/readarr:develop 
+    volumes: 
+      - myMedia:/mnt/media 
+      - myDlFolders:/mnt/downloads 
+      - /home/docker/mnt/fast/calibre_data/:/calibre
+      - /home/docker/mnt/fast/mediarr_data/readarr/config:/config 
+      - /home/docker/mnt/fast/mediarr_data/readarr/custom-services.d:/custom-services.d
+      - /home/docker/mnt/fast/mediarr_data/readarr/custom-cont-init.d:/custom-cont-init.d
+    # ports: 
+    #   - 8787:8787 
+    # depends_on: 
+    #   - prowlarr 
+    #   # - qbittorrent 
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.stack.network=traefik"  
+
+        - "traefik.http.routers.readarr.rule=Host(`readarr.hartig.es`)"
+        - "traefik.http.routers.readarr.entrypoints=https"
+        - "traefik.http.routers.readarr.tls=true"
+
+        - "traefik.http.services.readarr.loadbalancer.server.port=8787"
+
+        # - "traefik.constraint=proxy-public"
+  sonarr: 
+    <<: *default-container
+    image: lscr.io/linuxserver/sonarr:latest 
+    volumes: 
+      - myMedia:/mnt/media 
+      - myDlFolders:/mnt/downloads 
+      - /home/docker/mnt/fast/mediarr_data/sonarr/config:/config 
+      - /home/docker/mnt/fast/mediarr_data/sonarr/custom-services.d:/custom-services.d
+      - /home/docker/mnt/fast/mediarr_data/sonarr/custom-cont-init.d:/custom-cont-init.d
+    # depends_on: 
+    #   - prowlarr 
+    #   # - qbittorrent 
+    #   - jellyfin 
+    # ports: 
+    #   - 8989:8989 
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.stack.network=traefik"  
+
+        - "traefik.http.routers.sonarr.rule=Host(`sonarr.hartig.es`)"
+        - "traefik.http.routers.sonarr.entrypoints=https"
+        - "traefik.http.routers.sonarr.tls=true"
+
+        - "traefik.http.services.sonarr.loadbalancer.server.port=8989"
+
+        # - "traefik.constraint=proxy-public"
+
+  sabnzbd:
+    <<: *default-container
+    image: linuxserver/sabnzbd:latest
+    # ports:
+    #   - "8080:8080"
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.stack.network=traefik"  
+
+        - "traefik.http.routers.sabnzbd.rule=Host(`sabnzbd.hartig.es`)"
+        - "traefik.http.routers.sabnzbd.entrypoints=https"
+        - "traefik.http.routers.sabnzbd.tls=true"
+
+        - "traefik.http.services.sabnzbd.loadbalancer.server.port=8080"
+
+        # - "traefik.constraint=proxy-public"
+    volumes:
+      - myMedia:/mnt/media 
+      - myDlFolders:/mnt/downloads 
+      - /home/docker/mnt/fast/mediarr_data/sabnzbd/config:/config 
+      - /home/docker/mnt/fast/mediarr_data/sabnzbd/custom-cont-init.d:/custom-cont-init.d
+
+  tautulli:
+    <<: *default-container
+    image: linuxserver/tautulli:latest
+    # ports:
+    #   - "8181:8181"
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.stack.network=traefik"  
+
+        - "traefik.http.routers.tautulli.rule=Host(`tautulli.hartig.es`)"
+        - "traefik.http.routers.tautulli.entrypoints=https"
+        - "traefik.http.routers.tautulli.tls=true"
+
+        - "traefik.http.services.tautulli.loadbalancer.server.port=8181"
+
+        # - "traefik.constraint=proxy-public"
+    volumes:
+      - myMedia:/mnt/media 
+      - myDlFolders:/mnt/downloads 
+      - /home/docker/mnt/fast/mediarr_data/tautulli/config:/config 
+
+  tdarr:
+    <<: *default-container
+    image: ghcr.io/haveagitgat/tdarr:latest
+    # ports:
+    #   - 8265:8265 # webUI port
+    #   - 8266:8266 # server port
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.stack.network=traefik"  
+
+        - "traefik.http.routers.tdarr.rule=Host(`tdarr.hartig.es`)"
+        - "traefik.http.routers.tdarr.entrypoints=https"
+        - "traefik.http.routers.tdarr.tls=true"
+
+        - "traefik.http.services.tdarr.loadbalancer.server.port=8265"
+
+        # - "traefik.constraint=proxy-public"
+    environment:
+      - TZ=Europe/Berlin
+      - PUID=1000
+      - PGID=1000
+      - UMASK_SET=002
+      - serverIP=0.0.0.0
+      - serverPort=8266
+      - webUIPort=8265
+      - internalNode=true
+      - inContainer=true
+      - ffmpegVersion=7
+      - nodeName=MyInternalNode
+      # - NVIDIA_DRIVER_CAPABILITIES=all
+      # - NVIDIA_VISIBLE_DEVICES=all
+    volumes:
+      - /home/docker/mnt/fast/mediarr_data/tdarr/server:/app/server
+      - /home/docker/mnt/fast/mediarr_data/tdarr/configs:/app/configs
+      - /home/docker/mnt/fast/mediarr_data/tdarr/logs:/app/logs
+      - myMedia:/mnt/media 
+      - myDlFolders:/mnt/downloads 
+      - transcode_cache:/temp
+
+    # devices:
+    #   - /dev/dri:/dev/dri
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #       - driver: nvidia
+    #         count: all
+    #         capabilities: [gpu]
+  
+  profilarr:
+    <<: *default-container
+    image: santiagosayshey/profilarr:latest # or :beta
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.stack.network=traefik"  
+
+        - "traefik.http.routers.profilarr.rule=Host(`profilarr.hartig.es`)"
+        - "traefik.http.routers.profilarr.entrypoints=https"
+        - "traefik.http.routers.profilarr.tls=true"
+
+        - "traefik.http.services.profilarr.loadbalancer.server.port=6868"
+    # ports:
+    #   - 6868:6868
+    volumes:
+      - /home/docker/mnt/fast/mediarr_data/profilarr/config:/config
+  umlautadaptarr:
+    <<: *default-container
+    image: pcjones/umlautadaptarr:latest
+    # ports:
+      # - "5005:5005" # can be removed if you use the recommended prowlarr+proxy configuration 
+      # - "5006:5006" # can be removed if you use the alternative, non-proxy configuration
+    environment:
+      - PUID=1000 
+      - PGID=1000 
+      - TZ=Europe/Berlin
+      - SONARR__ENABLED=true
+      - SONARR__HOST=http://sonarr:8989
+      - SONARR__APIKEY=89963914e08643d4a779da1fce0f6c40
+      - RADARR__ENABLED=true
+      - RADARR__HOST=http://radarr:7878
+      - RADARR__APIKEY=961d0fc82a414f9a85847778c65f1e7d
+      - READARR__ENABLED=true
+      - READARR__HOST=http://readarr:8787
+      - READARR__APIKEY=11b712fd52874b53b06c835fac8ea9ba
+      - LIDARR__ENABLED=true
+      - LIDARR__HOST=http://lidarr:8686
+      - LIDARR__APIKEY=1a4c355b349c405c9989ea2e6f246f45
+  qbittorrent:
+    <<: *default-container
+    image: lscr.io/linuxserver/qbittorrent:latest
+    environment:
+      - PUID=1000 
+      - PGID=1000 
+      - TZ=Europe/Berlin
+      - WEBUI_PORT=8080
+      - TORRENTING_PORT=6881
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.stack.network=traefik"  
+
+        - "traefik.http.routers.qbittorrent.rule=Host(`qbittorrent.hartig.es`)"
+        - "traefik.http.routers.qbittorrent.entrypoints=https"
+        - "traefik.http.routers.qbittorrent.tls=true"
+
+        - "traefik.http.services.qbittorrent.loadbalancer.server.port=8080"
+    volumes:
+      - myMedia:/mnt/media 
+      - myDlFolders:/mnt/downloads 
+      - /home/docker/mnt/fast/mediarr_data/qbittorrent/config:/config
+    # ports:
+    #   - 8080:8080
+    #   - 6881:6881
+    #   - 6881:6881/udp
+  lidatube:
+    <<: *default-container
+    image: thewicklowwolf/lidatube:latest
+    volumes:
+      - /home/docker/mnt/fast/mediarr_data/lidatube/config:/lidatube/config
+      - myDlFolders:/lidatube/downloads 
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - attempt_lidarr_import=true
+      - PUID=1000 
+      - PGID=1000 
+      - TZ=Europe/Berlin
+    # ports:
+    #   - 5000:5000
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.stack.network=traefik"  
+
+        - "traefik.http.routers.lidatube.rule=Host(`lidatube.hartig.es`)"
+        - "traefik.http.routers.lidatube.entrypoints=https"
+        - "traefik.http.routers.lidatube.tls=true"
+
+        - "traefik.http.services.lidatube.loadbalancer.server.port=5000"
+networks:
+  traefik:
+    external: true
+volumes:
+  transcode_cache:
+  myMedia:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /home/docker/mnt/fast/media
+  myDlFolders:
+    driver: local
+    driver_opts: 
+      type: none
+      o: bind
+      device: /home/docker/mnt/fast/downloads
