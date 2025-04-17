@@ -128,7 +128,7 @@ services:
   #     - 6881:6881/udp 
   lidarr:
     <<: *default-container
-    image: lscr.io/linuxserver/lidarr:latest
+    image: ghcr.io/hotio/lidarr:pr-plugins #lscr.io/linuxserver/lidarr:latest
     volumes:
       - myMedia:/mnt/media 
       - myDlFolders:/mnt/downloads 
@@ -182,7 +182,7 @@ services:
     volumes: 
       - myMedia:/mnt/media 
       - myDlFolders:/mnt/downloads 
-      - /home/docker/mnt/fast/calibre_data/:/calibre
+      - /home/docker/mnt/slow/calibre_data/:/calibre
       - /home/docker/mnt/fast/mediarr_data/readarr/config:/config 
       - /home/docker/mnt/fast/mediarr_data/readarr/custom-services.d:/custom-services.d
       - /home/docker/mnt/fast/mediarr_data/readarr/custom-cont-init.d:/custom-cont-init.d
@@ -314,7 +314,7 @@ services:
       - /home/docker/mnt/fast/mediarr_data/tdarr/logs:/app/logs
       - myMedia:/mnt/media 
       - myDlFolders:/mnt/downloads 
-      - transcode_cache:/temp
+      - /home/docker/mnt/slow/temp:/temp
 
     # devices:
     #   - /dev/dri:/dev/dri
@@ -404,6 +404,8 @@ services:
       - PUID=1000 
       - PGID=1000 
       - TZ=Europe/Berlin
+      - sync_schedule=1
+      - sleep_interval=60
     # ports:
     #   - 5000:5000
     deploy:
@@ -416,6 +418,30 @@ services:
         - "traefik.http.routers.lidatube.tls=true"
 
         - "traefik.http.services.lidatube.loadbalancer.server.port=5000"
+  deemix:
+    <<: *default-container
+    image: ghcr.io/bambanah/deemix:latest
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Berlin
+      - DEEMIX_SINGLE_USER=true
+    volumes:
+      - myMedia:/mnt/media 
+      - myDlFolders:/mnt/downloads 
+      - /home/docker/mnt/fast/mediarr_data/deemix/config:/config
+    # ports:
+    #   - 6595:6595
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.stack.network=traefik"  
+
+        - "traefik.http.routers.deemix.rule=Host(`deemix.hartig.es`)"
+        - "traefik.http.routers.deemix.entrypoints=https"
+        - "traefik.http.routers.deemix.tls=true"
+
+        - "traefik.http.services.deemix.loadbalancer.server.port=6595"
 networks:
   traefik:
     external: true
@@ -426,10 +452,10 @@ volumes:
     driver_opts:
       type: none
       o: bind
-      device: /home/docker/mnt/fast/media
+      device: /home/docker/mnt/slow/media
   myDlFolders:
     driver: local
     driver_opts: 
       type: none
       o: bind
-      device: /home/docker/mnt/fast/downloads
+      device: /home/docker/mnt/slow/downloads
