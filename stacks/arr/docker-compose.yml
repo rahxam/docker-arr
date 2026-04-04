@@ -1,0 +1,591 @@
+x-default-container:
+  restart: always
+  environment:
+  - PUID=1000
+  - PGID=1000
+  - TZ=Europe/Berlin
+services:
+  reverse-proxy:
+    image: traefik:v3.3
+    environment:
+    - CLOUDFLARE_DNS_API_TOKEN_FILE=/run/secrets/cf_token
+    - CLOUDFLARE_HTTP_TIMEOUT=60
+    - CLOUDFLARE_POLLING_INTERVAL=10
+    - CLOUDFLARE_PROPAGATION_TIMEOUT=3600
+    - CLOUDFLARE_TTL=300
+    labels:
+    - traefik.enable=true
+    - traefik.constraint=proxy-public
+    - traefik.http.routers.traefik.entrypoints=http
+    - traefik.http.routers.traefik.rule=Host(`traefik.arr.hartig.es`)
+    - traefik.http.middlewares.traefik-https-redirect.redirectscheme.scheme=https
+    - traefik.http.middlewares.sslheader.headers.customrequestheaders.X-Forwarded-Proto=https
+    - traefik.http.routers.traefik.middlewares=traefik-https-redirect
+    - traefik.http.routers.traefik-secure.entrypoints=https
+    - traefik.http.routers.traefik-secure.rule=Host(`traefik.arr.hartig.es`)
+    - traefik.http.routers.traefik-secure.tls=true
+    - traefik.http.routers.traefik-secure.tls.certresolver=cloudflare
+    - traefik.http.routers.traefik-secure.tls.domains[0].main=arr.hartig.es
+    - traefik.http.routers.traefik-secure.tls.domains[0].sans=*.arr.hartig.es
+    - traefik.http.routers.traefik-secure.service=api@internal
+    - traefik.http.services.api.loadbalancer.server.port=8080
+    - traefik.http.routers.traefik.middlewares=error-pages-middleware
+    ports:
+    - target: 80
+      published: 180
+    - target: 443
+      published: 443
+    - target: 8080
+      published: 8080
+    networks:
+    - traefik
+    - internal
+    command:
+    - --accessLog=true
+    - --logLevel=INFO
+    volumes:
+    - /etc/localtime:/etc/localtime:ro
+    - /var/run/docker.sock:/var/run/docker.sock
+    - /mnt/external/fast/traefik_data/traefik_arr/traefik.yml:/etc/traefik/traefik.yml:ro
+    - /mnt/external/fast/traefik_data/traefik_arr/acme.json:/acme.json:ro
+    - acme:/acme
+    - /mnt/external/fast/traefik_data/traefik_arr/logs:/var/log/traefik
+    - /mnt/external/fast/traefik_data/traefik_arr/config.yml:/config.yml:ro
+    - /mnt/external/fast/traefik_data/traefik_arr/cf_secret:/run/secrets/cf_token
+    restart: unless-stopped
+    container_name: arr-reverse-proxy
+  error-pages:
+    image: tarampampam/error-pages:2.26.0
+    environment:
+      TEMPLATE_NAME: l7-dark
+    networks:
+    - traefik
+    labels:
+      traefik.enable: 'true'
+      traefik.swarm.network: traefik
+      traefik.http.routers.error-pages-router.rule: HostRegexp(`.+`)
+      traefik.http.routers.error-pages-router.priority: 10
+      traefik.http.routers.error-pages-router.entrypoints: https
+      traefik.http.routers.error-pages-router.tls: 'true'
+      traefik.http.routers.error-pages-router.middlewares: error-pages-middleware
+      traefik.http.middlewares.error-pages-middleware.errors.status: 400-599
+      traefik.http.middlewares.error-pages-middleware.errors.service: error-pages-service
+      traefik.http.middlewares.error-pages-middleware.errors.query: /{status}.html
+      traefik.http.services.error-pages-service.loadbalancer.server.port: 8080
+    restart: unless-stopped
+    container_name: arr-error-pages
+  cloudflare-companion:
+    image: ghcr.io/tiredofit/docker-traefik-cloudflare-companion:latest
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+    - /mnt/external/fast/traefik_data/traefik_arr/cf_secret:/run/secrets/cf_token
+    environment:
+    - TIMEZONE=Europe/Berlin
+    - LOG_TYPE=CONSOLE
+    - LOG_LEVEL=DEBUG
+    - DRY_RUN=FALSE
+    - TRAEFIK_VERSION=2
+    - RC_TYPE=CNAME
+    - TARGET_DOMAIN=arr.hartig.es
+    - REFRESH_ENTRIES=TRUE
+    - DOCKER_SWARM_MODE=FALSE
+    - DOMAIN1_EXCLUDED_SUB_DOMAINS=int
+    - TRAEFIK_FILTER_LABEL=traefik.constraint
+    - TRAEFIK_FILTER=proxy-public
+    - DOMAIN1=arr.hartig.es
+    - DOMAIN1_ZONE_ID=55b8140846abb0f43d6a8d2f92073d23
+    - DOMAIN1_PROXIED=TRUE
+    networks:
+    - internal
+    restart: unless-stopped
+    container_name: arr-cloudflare-companion
+  gluetun:
+    image: qmcgaw/gluetun
+    cap_add:
+    - NET_ADMIN
+    devices:
+    - /dev/net/tun:/dev/net/tun
+    networks:
+    - traefik
+    ports:
+    - 8888:8888/tcp
+    - 8388:8388/tcp
+    - 8388:8388/udp
+    volumes:
+    - gluetun:/gluetun
+    environment:
+    - VPN_SERVICE_PROVIDER=privado
+    - OPENVPN_USER=ewnvwmwohc
+    - OPENVPN_PASSWORD=${OPENVPN_PASSWORD}
+    - SERVER_REGIONS=North Holland
+    - HTTPPROXY=on
+    - SHADOWSOCKS=on
+    labels:
+    - traefik.enable=true
+    - traefik.constraint=proxy-public
+    - traefik.http.routers.qbittorrent.rule=Host(`qbittorrent.arr.hartig.es`)
+    - traefik.http.routers.qbittorrent.entrypoints=https
+    - traefik.http.routers.qbittorrent.tls=true
+    - traefik.http.routers.qbittorrent.service=qbittorrent-service
+    - traefik.http.services.qbittorrent-service.loadbalancer.server.port=8081
+    - traefik.http.routers.sabnzbd.rule=Host(`sabnzbd.arr.hartig.es`)
+    - traefik.http.routers.sabnzbd.entrypoints=https
+    - traefik.http.routers.sabnzbd.tls=true
+    - traefik.http.routers.sabnzbd.service=sabnzbd-service
+    - traefik.http.services.sabnzbd-service.loadbalancer.server.port=8080
+    - traefik.http.routers.slskd.rule=Host(`slskd.arr.hartig.es`)
+    - traefik.http.routers.slskd.entrypoints=https
+    - traefik.http.routers.slskd.tls=true
+    - traefik.http.routers.slskd.service=slskd-service
+    - traefik.http.services.slskd-service.loadbalancer.server.port=5030
+    restart: unless-stopped
+    container_name: arr-gluetun
+  bazarr:
+    restart: always
+    environment:
+    - PUID=1000
+    - PGID=1000
+    - TZ=Europe/Berlin
+    networks:
+    - traefik
+    image: lscr.io/linuxserver/bazarr:latest
+    volumes:
+    - /mnt/external/fast/mediarr_data/bazarr/config:/config
+    - /mnt/external/slow/media:/mnt/media
+    - /mnt/external/slow/downloads:/mnt/downloads
+    depends_on:
+    - sonarr
+    - radarr
+    labels:
+    - traefik.enable=true
+    - traefik.constraint=proxy-public
+    - traefik.stack.network=traefik
+    - traefik.http.routers.bazarr.rule=Host(`bazarr.arr.hartig.es`)
+    - traefik.http.routers.bazarr.entrypoints=https
+    - traefik.http.routers.bazarr.tls=true
+    - traefik.http.services.bazarr.loadbalancer.server.port=6767
+    container_name: arr-bazarr
+  overseerr:
+    restart: always
+    environment:
+    - PUID=1000
+    - PGID=1000
+    - TZ=Europe/Berlin
+    - LOG_LEVEL=${LOG_LEVEL:-info}
+    networks:
+    - traefik
+    image: lscr.io/linuxserver/overseerr:latest
+    labels:
+    - traefik.enable=true
+    - traefik.constraint=proxy-public
+    - traefik.stack.network=traefik
+    - traefik.http.routers.overseerr.rule=Host(`overseerr.arr.hartig.es`)
+    - traefik.http.routers.overseerr.entrypoints=https
+    - traefik.http.routers.overseerr.tls=true
+    - traefik.http.services.overseerr.loadbalancer.server.port=5055
+    volumes:
+    - /mnt/external/fast/mediarr_data/overseer/config:/config
+    - /mnt/external/slow/media:/mnt/media
+    - /mnt/external/slow/downloads:/mnt/downloads
+    container_name: arr-overseerr
+  prowlarr:
+    restart: always
+    environment:
+    - PUID=1000
+    - PGID=1000
+    - TZ=Europe/Berlin
+    networks:
+    - traefik
+    image: linuxserver/prowlarr:latest
+    volumes:
+    - /mnt/external/fast/mediarr_data/prowlarr/config:/config
+    - /mnt/external/slow/media:/mnt/media
+    - /mnt/external/slow/downloads:/mnt/downloads
+    depends_on:
+    - flaresolverr
+    labels:
+    - traefik.enable=true
+    - traefik.constraint=proxy-public
+    - traefik.stack.network=traefik
+    - traefik.http.routers.prowlarr.rule=Host(`prowlarr.arr.hartig.es`)
+    - traefik.http.routers.prowlarr.entrypoints=https
+    - traefik.http.routers.prowlarr.tls=true
+    - traefik.http.services.prowlarr.loadbalancer.server.port=9696
+    container_name: arr-prowlarr
+  flaresolverr:
+    restart: always
+    environment:
+    - PUID=1000
+    - PGID=1000
+    - TZ=Europe/Berlin
+    - LOG_LEVEL=${LOG_LEVEL:-info}
+    - LOG_HTML=${LOG_HTML:-false}
+    - CAPTCHA_SOLVER=${CAPTCHA_SOLVER:-none}
+    networks:
+    - traefik
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    volumes:
+    - /mnt/external/slow/media:/mnt/media
+    - /mnt/external/slow/downloads:/mnt/downloads
+    labels:
+    - traefik.enable=true
+    - traefik.constraint=proxy-public
+    - traefik.stack.network=traefik
+    - traefik.http.routers.flaresolverr.rule=Host(`flaresolverr.arr.hartig.es`)
+    - traefik.http.routers.flaresolverr.entrypoints=https
+    - traefik.http.routers.flaresolverr.tls=true
+    - traefik.http.services.flaresolverr.loadbalancer.server.port=8191
+    container_name: arr-flaresolverr
+  lidarr_extended:
+    restart: always
+    environment:
+    - PUID=1000
+    - PGID=1000
+    - TZ=Europe/Berlin
+    networks:
+    - traefik
+    image: lscr.io/linuxserver/lidarr:latest
+    volumes:
+    - /mnt/external/slow/media:/mnt/media
+    - /mnt/external/slow/downloads:/mnt/downloads
+    - /mnt/external/fast/mediarr_data/lidarr_extended/config:/config
+    - /mnt/external/fast/mediarr_data/lidarr_extended/custom-services.d:/custom-services.d
+    - /mnt/external/fast/mediarr_data/lidarr_extended/custom-cont-init.d:/custom-cont-init.d
+    labels:
+    - traefik.enable=true
+    - traefik.constraint=proxy-public
+    - traefik.stack.network=traefik
+    - traefik.http.routers.lidarr.rule=Host(`lidarr-extended.arr.hartig.es`)
+    - traefik.http.routers.lidarr.entrypoints=https
+    - traefik.http.routers.lidarr.tls=true
+    - traefik.http.services.lidarr.loadbalancer.server.port=8686
+    container_name: arr-lidarr_extended
+  postgres:
+    image: docker.io/library/postgres:14
+    networks:
+    - internal
+    volumes:
+    - postgres:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    restart: unless-stopped
+    container_name: arr-postgres
+  pgadmin-arr:
+    restart: always
+    environment:
+    - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
+    - PGADMIN_DEFAULT_EMAIL=m@iu0.de
+    image: dpage/pgadmin4
+    networks:
+    - internal
+    - traefik
+    volumes:
+    - /mnt/external/fast/mediarr_data/pgadmin/servers.json:/pgadmin4/servers.json
+    - /mnt/external/fast/mediarr_data/pgadmin/pgadmin:/var/lib/pgadmin
+    labels:
+    - traefik.enable=true
+    - traefik.constraint=proxy-public
+    - traefik.stack.network=traefik
+    - traefik.http.routers.pgadmin-arr.rule=Host(`pgadmin.arr.hartig.es`)
+    - traefik.http.routers.pgadmin-arr.entrypoints=https
+    - traefik.http.routers.pgadmin-arr.tls=true
+    - traefik.http.services.pgadmin-arr.loadbalancer.server.port=80
+    container_name: arr-pgadmin-arr
+  lidarr:
+    restart: always
+    environment:
+    - PUID=1000
+    - PGID=1000
+    - TZ=Europe/Berlin
+    image: ghcr.io/linuxserver-labs/prarr:lidarr-plugins
+    volumes:
+    - /mnt/external/slow/downloads:/mnt/downloads
+    - /mnt/external/fast/mediarr_data/lidarr/config:/config
+    networks:
+    - internal
+    - traefik
+    labels:
+    - traefik.enable=true
+    - traefik.constraint=proxy-public
+    - traefik.stack.network=traefik
+    - traefik.http.routers.lidarr.rule=Host(`lidarr.arr.hartig.es`)
+    - traefik.http.routers.lidarr.entrypoints=https
+    - traefik.http.routers.lidarr.tls=true
+    - traefik.http.services.lidarr.loadbalancer.server.port=8686
+    container_name: arr-lidarr
+  radarr:
+    restart: always
+    environment:
+    - PUID=1000
+    - PGID=1000
+    - TZ=Europe/Berlin
+    networks:
+    - traefik
+    image: lscr.io/linuxserver/radarr:latest
+    volumes:
+    - /mnt/external/slow/media:/mnt/media
+    - /mnt/external/slow/downloads:/mnt/downloads
+    - /mnt/external/fast/mediarr_data/radarr/config:/config
+    - /mnt/external/fast/mediarr_data/radarr/custom-services.d:/custom-services.d
+    - /mnt/external/fast/mediarr_data/radarr/custom-cont-init.d:/custom-cont-init.d
+    ports:
+    - 7878:7878
+    depends_on:
+    - prowlarr
+    - qbittorrent
+    labels:
+    - traefik.enable=true
+    - traefik.constraint=proxy-public
+    - traefik.stack.network=traefik
+    - traefik.http.routers.radarr.rule=Host(`radarr.arr.hartig.es`)
+    - traefik.http.routers.radarr.entrypoints=https
+    - traefik.http.routers.radarr.tls=true
+    - traefik.http.services.radarr.loadbalancer.server.port=7878
+    container_name: arr-radarr
+  readarr:
+    restart: always
+    environment:
+    - PUID=1000
+    - PGID=1000
+    - TZ=Europe/Berlin
+    networks:
+    - traefik
+    image: lscr.io/linuxserver/readarr:develop
+    volumes:
+    - /mnt/external/slow/media:/mnt/media
+    - /mnt/external/slow/downloads:/mnt/downloads
+    - /mnt/external/slow/calibre_data/:/calibre
+    - /mnt/external/fast/mediarr_data/readarr/config:/config
+    - /mnt/external/fast/mediarr_data/readarr/custom-services.d:/custom-services.d
+    - /mnt/external/fast/mediarr_data/readarr/custom-cont-init.d:/custom-cont-init.d
+    depends_on:
+    - prowlarr
+    - qbittorrent
+    labels:
+    - traefik.enable=true
+    - traefik.constraint=proxy-public
+    - traefik.stack.network=traefik
+    - traefik.http.routers.readarr.rule=Host(`readarr.arr.hartig.es`)
+    - traefik.http.routers.readarr.entrypoints=https
+    - traefik.http.routers.readarr.tls=true
+    - traefik.http.services.readarr.loadbalancer.server.port=8787
+    container_name: arr-readarr
+  sonarr:
+    restart: always
+    environment:
+    - PUID=1000
+    - PGID=1000
+    - TZ=Europe/Berlin
+    networks:
+    - traefik
+    image: lscr.io/linuxserver/sonarr:latest
+    volumes:
+    - /mnt/external/slow/media:/mnt/media
+    - /mnt/external/slow/downloads:/mnt/downloads
+    - /mnt/external/fast/mediarr_data/sonarr/config:/config
+    - /mnt/external/fast/mediarr_data/sonarr/custom-services.d:/custom-services.d
+    - /mnt/external/fast/mediarr_data/sonarr/custom-cont-init.d:/custom-cont-init.d
+    depends_on:
+    - prowlarr
+    - qbittorrent
+    labels:
+    - traefik.enable=true
+    - traefik.constraint=proxy-public
+    - traefik.stack.network=traefik
+    - traefik.http.routers.sonarr.rule=Host(`sonarr.arr.hartig.es`)
+    - traefik.http.routers.sonarr.entrypoints=https
+    - traefik.http.routers.sonarr.tls=true
+    - traefik.http.services.sonarr.loadbalancer.server.port=8989
+    container_name: arr-sonarr
+  sabnzbd:
+    restart: always
+    environment:
+    - PUID=1000
+    - PGID=1000
+    - TZ=Europe/Berlin
+    image: linuxserver/sabnzbd:latest
+    network_mode: service:gluetun
+    volumes:
+    - /mnt/external/slow/media:/mnt/media
+    - /mnt/external/slow/downloads:/mnt/downloads
+    - /mnt/external/fast/mediarr_data/sabnzbd/config:/config
+    - /mnt/external/fast/mediarr_data/sabnzbd/custom-cont-init.d:/custom-cont-init.d
+    container_name: arr-sabnzbd
+  tautulli:
+    restart: always
+    environment:
+    - PUID=1000
+    - PGID=1000
+    - TZ=Europe/Berlin
+    networks:
+    - traefik
+    image: linuxserver/tautulli:latest
+    labels:
+    - traefik.enable=true
+    - traefik.constraint=proxy-public
+    - traefik.stack.network=traefik
+    - traefik.http.routers.tautulli.rule=Host(`tautulli.arr.hartig.es`)
+    - traefik.http.routers.tautulli.entrypoints=https
+    - traefik.http.routers.tautulli.tls=true
+    - traefik.http.services.tautulli.loadbalancer.server.port=8181
+    volumes:
+    - /mnt/external/slow/media:/mnt/media
+    - /mnt/external/slow/downloads:/mnt/downloads
+    - /mnt/external/fast/mediarr_data/tautulli/config:/config
+    container_name: arr-tautulli
+  tdarr:
+    restart: always
+    environment:
+    - TZ=Europe/Berlin
+    - PUID=1000
+    - PGID=1000
+    - UMASK_SET=002
+    - serverIP=0.0.0.0
+    - serverPort=8266
+    - webUIPort=8265
+    - internalNode=true
+    - inContainer=true
+    - ffmpegVersion=7
+    - nodeName=MyInternalNode
+    networks:
+    - traefik
+    image: ghcr.io/haveagitgat/tdarr:latest
+    labels:
+    - traefik.enable=true
+    - traefik.constraint=proxy-public
+    - traefik.stack.network=traefik
+    - traefik.http.routers.tdarr.rule=Host(`tdarr.arr.hartig.es`)
+    - traefik.http.routers.tdarr.entrypoints=https
+    - traefik.http.routers.tdarr.tls=true
+    - traefik.http.services.tdarr.loadbalancer.server.port=8265
+    volumes:
+    - /mnt/external/fast/mediarr_data/tdarr/server:/app/server
+    - /mnt/external/fast/mediarr_data/tdarr/configs:/app/configs
+    - /mnt/external/fast/mediarr_data/tdarr/logs:/app/logs
+    - /mnt/external/slow/media:/mnt/media
+    - /mnt/external/slow/downloads:/mnt/downloads
+    - /mnt/external/slow/temp:/temp
+    devices:
+    - /dev/dri:/dev/dri
+    container_name: arr-tdarr
+  profilarr:
+    restart: always
+    environment:
+    - PUID=1000
+    - PGID=1000
+    - TZ=Europe/Berlin
+    networks:
+    - traefik
+    image: santiagosayshey/profilarr:latest
+    labels:
+    - traefik.enable=true
+    - traefik.constraint=proxy-public
+    - traefik.stack.network=traefik
+    - traefik.http.routers.profilarr.rule=Host(`profilarr.arr.hartig.es`)
+    - traefik.http.routers.profilarr.entrypoints=https
+    - traefik.http.routers.profilarr.tls=true
+    - traefik.http.services.profilarr.loadbalancer.server.port=6868
+    volumes:
+    - /mnt/external/fast/mediarr_data/profilarr/config:/config
+    container_name: arr-profilarr
+  umlautadaptarr:
+    restart: always
+    environment:
+    - PUID=1000
+    - PGID=1000
+    - TZ=Europe/Berlin
+    - SONARR__ENABLED=true
+    - SONARR__HOST=http://sonarr:8989
+    - SONARR__APIKEY=${SONARR__APIKEY}
+    - RADARR__ENABLED=true
+    - RADARR__HOST=http://radarr:7878
+    - RADARR__APIKEY=${RADARR__APIKEY}
+    - READARR__ENABLED=true
+    - READARR__HOST=http://readarr:8787
+    - READARR__APIKEY=${READARR__APIKEY}
+    - LIDARR__ENABLED=true
+    - LIDARR__HOST=http://lidarr:8686
+    - LIDARR__APIKEY=${LIDARR__APIKEY}
+    networks:
+    - traefik
+    image: pcjones/umlautadaptarr:latest
+    container_name: arr-umlautadaptarr
+  qbittorrent:
+    restart: always
+    environment:
+    - PUID=1000
+    - PGID=1000
+    - TZ=Europe/Berlin
+    - WEBUI_PORT=8081
+    - TORRENTING_PORT=6881
+    image: lscr.io/linuxserver/qbittorrent:latest
+    network_mode: service:gluetun
+    volumes:
+    - /mnt/external/slow/media:/mnt/media
+    - /mnt/external/slow/downloads:/mnt/downloads
+    - /mnt/external/fast/mediarr_data/qbittorrent/config:/config
+    container_name: arr-qbittorrent
+  lidatube:
+    restart: always
+    environment:
+    - attempt_lidarr_import=true
+    - PUID=1000
+    - PGID=1000
+    - TZ=Europe/Berlin
+    - sync_schedule=1
+    - sleep_interval=60
+    networks:
+    - traefik
+    image: thewicklowwolf/lidatube:latest
+    volumes:
+    - /mnt/external/fast/mediarr_data/lidatube/config:/lidatube/config
+    - /mnt/external/slow/media/music:/lidatube/downloads
+    - /etc/localtime:/etc/localtime:ro
+    labels:
+    - traefik.enable=true
+    - traefik.constraint=proxy-public
+    - traefik.stack.network=traefik
+    - traefik.http.routers.lidatube.rule=Host(`lidatube.arr.hartig.es`)
+    - traefik.http.routers.lidatube.entrypoints=https
+    - traefik.http.routers.lidatube.tls=true
+    - traefik.http.services.lidatube.loadbalancer.server.port=5000
+    container_name: arr-lidatube
+  soularr:
+    restart: always
+    environment:
+    - PUID=1000
+    - PGID=1000
+    - TZ=Europe/Berlin
+    - SCRIPT_INTERVAL=300
+    networks:
+    - traefik
+    image: mrusse08/soularr:latest
+    volumes:
+    - /mnt/external/fast/mediarr_data/soularr/config:/data
+    - /mnt/external/slow/downloads:/downloads
+    - /etc/localtime:/etc/localtime:ro
+    container_name: arr-soularr
+  slskd:
+    restart: always
+    environment:
+    - PUID=1000
+    - PGID=1000
+    - TZ=Europe/Berlin
+    - SLSKD_REMOTE_CONFIGURATION=true
+    image: slskd/slskd
+    network_mode: service:gluetun
+    volumes:
+    - /mnt/external/slow/downloads:/downloads
+    - /mnt/external/fast/mediarr_data/slskd/config:/app
+    container_name: arr-slskd
+networks:
+  traefik:
+    external: true
+  internal: null
+volumes:
+  transcode_cache: null
+  postgres: null
+  gluetun: null
+  acme: null

@@ -1,0 +1,11 @@
+**/.env
+**/.env.pre-portainerdb
+**/*.swarm.yml
+**/*.swarm.yaml
+**/*.pre-secrets.yml
+**/*.pre-secrets.yaml
+**/.venv/
+**/__pycache__/
+**/*.pyc
+**/.cache
+**/spotiplex.env
