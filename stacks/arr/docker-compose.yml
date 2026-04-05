@@ -131,7 +131,7 @@ services:
     networks:
     - internal
     volumes:
-    - postgres:/var/lib/postgresql/data
+    - ${FAST_ROOT}/mediarr_data/postgres/data:/var/lib/postgresql/data
     environment:
       POSTGRES_DB: postgres
       POSTGRES_USER: postgres
@@ -452,6 +452,3 @@ networks:
   internal: null
 volumes:
   transcode_cache: null
-  postgres: null
-  gluetun: null
-  acme: null

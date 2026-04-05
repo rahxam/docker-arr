@@ -10,7 +10,7 @@ Konsolidiertes Unraid-Repository (aus bestehenden Einzelstacks).
 2. Docker-Netzwerk `traefik` muss existieren.
 3. `stacks/arr/.env` aus `stacks/arr/.env.example` befuellen.
 4. Unraid-Pfade in `.env` setzen (`FAST_ROOT`, `SLOW_ROOT`).
-5. `./deploy-all.sh` ausfuehren.
+5. Aus dem Repo-Verzeichnis deployen: `cd /mnt/fast/system/docker-arr && ./deploy-all.sh`.
 
 ## Unraid Hinweise
 - Typische IDs: `PUID=99`, `PGID=100`.
