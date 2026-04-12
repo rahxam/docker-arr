@@ -34,7 +34,7 @@ services:
     healthcheck:
       test:
       - CMD-SHELL
-      - (command -v wget >/dev/null 2>&1 && wget --no-verbose --tries=1 --spider http://localhost:6767/) || (command -v curl >/dev/null 2>&1 && curl -fsS http://localhost:6767/ >/dev/null) || exit 1
+      - code=$$(curl -s -o /dev/null -w '%{http_code}' http://localhost:6767/ || true); echo "$$code" | grep -Eq '^(200|301|302|401)$'
       interval: 30s
       timeout: 5s
       retries: 5
@@ -515,7 +515,7 @@ services:
     healthcheck:
       test:
       - CMD-SHELL
-      - (command -v wget >/dev/null 2>&1 && wget --no-verbose --tries=1 --spider http://localhost:5000/) || (command -v curl >/dev/null 2>&1 && curl -fsS http://localhost:5000/ >/dev/null) || exit 1
+      - ps aux | grep -Eq '[s]uggestarr|[p]ython|[n]ode'
       interval: 30s
       timeout: 5s
       retries: 5
@@ -570,20 +570,14 @@ services:
     - RADARR__HOST=http://radarr:7878
     - RADARR__APIKEY=${RADARR__APIKEY}
     - READARR__ENABLED=false
-    - LIDARR__ENABLED=true
+    - LIDARR__ENABLED=false
     - LIDARR__HOST=http://lidarr:8686
     - LIDARR__APIKEY=${LIDARR__APIKEY}
     networks:
     - traefik
     image: pcjones/umlautadaptarr:latest
     healthcheck:
-      test:
-      - CMD-SHELL
-      - pgrep -f umlautadaptarr >/dev/null || pgrep -f dotnet >/dev/null
-      interval: 30s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+      disable: true
     container_name: arr-umlautadaptarr
   calibre-web-automated:
     restart: always
@@ -632,7 +626,7 @@ services:
     healthcheck:
       test:
       - CMD-SHELL
-      - (command -v wget >/dev/null 2>&1 && wget --no-verbose --tries=1 --spider http://localhost:5007/) || (command -v curl >/dev/null 2>&1 && curl -fsS http://localhost:5007/ >/dev/null) || exit 1
+      - awk 'NR>1 && $$2 ~ /:138F$$/ && $$4 == "0A" {found=1} END{exit found?0:1}' /proc/net/tcp /proc/net/tcp6
       interval: 30s
       timeout: 5s
       retries: 5
@@ -867,7 +861,7 @@ services:
     healthcheck:
       test:
       - CMD-SHELL
-      - (command -v wget >/dev/null 2>&1 && wget --no-verbose --tries=1 --spider http://localhost:8080/) || (command -v curl >/dev/null 2>&1 && curl -fsS http://localhost:8080/ >/dev/null) || exit 1
+      - awk 'NR>1 && $$2 ~ /:1F90/ && $$4 == "0A" {found=1} END{exit found?0:1}' /proc/net/tcp /proc/net/tcp6
       interval: 30s
       timeout: 5s
       retries: 5
@@ -884,13 +878,14 @@ services:
     - PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
     - DEFAULT_WORKSPACE=/config/ytdl-sub-configs
     - UPDATE_YT_DLP_ON_START=stable
+    - CRON_SCHEDULE=0 */6 * * *
     networks:
     - traefik
     image: ghcr.io/jmbannon/ytdl-sub:latest
     healthcheck:
       test:
       - CMD-SHELL
-      - (command -v wget >/dev/null 2>&1 && wget --no-verbose --tries=1 --spider http://localhost/) || (command -v curl >/dev/null 2>&1 && curl -fsS http://localhost/ >/dev/null) || exit 1
+      - pgrep -f '[c]rond' >/dev/null || pgrep -f '[s]6-svscan' >/dev/null
       interval: 30s
       timeout: 5s
       retries: 5
