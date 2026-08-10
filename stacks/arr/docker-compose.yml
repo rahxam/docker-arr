@@ -14,7 +14,7 @@ services:
     - TZ=${TZ}
     networks:
     - traefik
-    image: lscr.io/linuxserver/bazarr:latest
+    image: lscr.io/linuxserver/bazarr:v1.6.0-ls357
     volumes:
     - ${FAST_ROOT}/mediarr_data/bazarr/config:/config
     - ${SLOW_ROOT}/media:/mnt/media
@@ -51,7 +51,7 @@ services:
     - PORT=5055
     networks:
     - traefik
-    image: ghcr.io/seerr-team/seerr:latest
+    image: ghcr.io/seerr-team/seerr:v3.4.1
     labels:
     - traefik.enable=true
     - traefik.constraint=proxy-public
@@ -82,7 +82,7 @@ services:
     - TZ=${TZ}
     networks:
     - traefik
-    image: linuxserver/prowlarr:latest
+    image: linuxserver/prowlarr:2.5.2.5491-ls156
     volumes:
     - ${FAST_ROOT}/mediarr_data/prowlarr/config:/config
     - ${SLOW_ROOT}/media:/mnt/media
@@ -118,7 +118,7 @@ services:
     - CAPTCHA_SOLVER=${CAPTCHA_SOLVER:-none}
     networks:
     - traefik
-    image: ghcr.io/flaresolverr/flaresolverr:latest
+    image: ghcr.io/flaresolverr/flaresolverr:v3.5.0
     volumes:
     - ${SLOW_ROOT}/media:/mnt/media
     - /mnt/fast/appdata/downloads:/mnt/downloads
@@ -190,7 +190,7 @@ services:
     environment:
     - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_DEFAULT_PASSWORD}
     - PGADMIN_DEFAULT_EMAIL=${PGADMIN_DEFAULT_EMAIL}
-    image: dpage/pgadmin4
+    image: dpage/pgadmin4:9.17
     networks:
     - internal
     - traefik
@@ -274,7 +274,7 @@ services:
     - TZ=${TZ}
     networks:
     - traefik
-    image: lscr.io/linuxserver/radarr:latest
+    image: lscr.io/linuxserver/radarr:6.3.0.10514-ls312
     volumes:
     - ${SLOW_ROOT}/media:/mnt/media
     - /mnt/fast/appdata/downloads:/mnt/downloads
@@ -310,7 +310,7 @@ services:
     - TZ=${TZ}
     networks:
     - traefik
-    image: lscr.io/linuxserver/sonarr:latest
+    image: lscr.io/linuxserver/sonarr:4.0.19.2979-ls321
     volumes:
     - ${SLOW_ROOT}/media:/mnt/media
     - /mnt/fast/appdata/downloads:/mnt/downloads
@@ -344,7 +344,7 @@ services:
     - PUID=${PUID}
     - PGID=${PGID}
     - TZ=${TZ}
-    image: linuxserver/sabnzbd:latest
+    image: linuxserver/sabnzbd:5.1.0-ls266
     network_mode: service:gluetun-nl
     depends_on:
       gluetun-nl:
@@ -372,7 +372,7 @@ services:
     - TZ=${TZ}
     networks:
     - traefik
-    image: linuxserver/tautulli:latest
+    image: linuxserver/tautulli:v2.17.2-ls239
     labels:
     - traefik.enable=true
     - traefik.constraint=proxy-public
@@ -416,7 +416,7 @@ services:
     - ffmpegDecoderAccel=amd-h264
     networks:
     - traefik
-    image: ghcr.io/haveagitgat/tdarr:latest
+    image: ghcr.io/haveagitgat/tdarr:2.86.01
     labels:
     - traefik.enable=true
     - traefik.constraint=proxy-public
@@ -449,7 +449,7 @@ services:
     - TZ=${TZ}
     networks:
     - traefik
-    image: ghcr.io/maintainerr/maintainerr:latest
+    image: ghcr.io/maintainerr/maintainerr:3.22.1
     labels:
     - traefik.enable=true
     - traefik.constraint=proxy-public
@@ -478,7 +478,7 @@ services:
     - TZ=${TZ}
     networks:
     - traefik
-    image: santiagosayshey/profilarr:latest
+    image: santiagosayshey/profilarr:v1.1.5
     labels:
     - traefik.enable=true
     - traefik.constraint=proxy-public
@@ -506,7 +506,7 @@ services:
     - SUGGESTARR_PORT=5000
     networks:
     - traefik
-    image: ciuse99/suggestarr:latest
+    image: ciuse99/suggestarr:v2.12.0
     labels:
     - traefik.enable=true
     - traefik.constraint=proxy-public
@@ -549,7 +549,7 @@ services:
       api_key = "${SONARR__APIKEY}"
     networks:
     - traefik
-    image: phueber/prefetcharr:latest
+    image: phueber/prefetcharr:1.6.2
     healthcheck:
       test:
       - CMD-SHELL
@@ -579,7 +579,7 @@ services:
     - LIDARR__APIKEY=${LIDARR__APIKEY}
     networks:
     - traefik
-    image: pcjones/umlautadaptarr:latest
+    image: pcjones/umlautadaptarr:0.7.5
     healthcheck:
       disable: true
     container_name: arr-umlautadaptarr
@@ -592,7 +592,7 @@ services:
     - NETWORK_SHARE_MODE=true
     networks:
     - traefik
-    image: crocodilestick/calibre-web-automated:latest
+    image: crocodilestick/calibre-web-automated:v4.0.6
     volumes:
     - ${FAST_ROOT}/mediarr_data/calibre-web-automated/config:/config
     - ${FAST_ROOT}/mediarr_data/calibre-web-automated/ingest:/cwa-book-ingest
@@ -652,7 +652,7 @@ services:
     - TZ=${TZ}
     networks:
     - traefik
-    image: ghcr.io/calibrain/shelfmark:latest
+    image: ghcr.io/calibrain/shelfmark:1.3.5
     volumes:
     - ${FAST_ROOT}/mediarr_data/shelfmark/config:/config
     - ${FAST_ROOT}/mediarr_data/calibre-web-automated/ingest:/books
@@ -682,7 +682,7 @@ services:
     - TZ=${TZ}
     - WEBUI_PORT=8081
     - TORRENTING_PORT=6881
-    image: lscr.io/linuxserver/qbittorrent:latest
+    image: lscr.io/linuxserver/qbittorrent:5.2.3_v2.0.14-ls471
     network_mode: service:gluetun-nl
     depends_on:
       gluetun-nl:
@@ -765,7 +765,7 @@ services:
     - SCRIPT_INTERVAL=300
     networks:
     - traefik
-    image: mrusse08/soularr:latest
+    image: mrusse08/soularr:latest@sha256:9d17bdc35108afd747c4862dc32a0c1cba821638d170e1374188a977ce255c76
     healthcheck:
       test:
       - CMD-SHELL
@@ -787,7 +787,7 @@ services:
     - TZ=${TZ}
     - ASPNETCORE_URLS=http://0.0.0.0:5030
     - SLSKD_REMOTE_CONFIGURATION=true
-    image: slskd/slskd
+    image: slskd/slskd:0.25.1
     network_mode: service:gluetun-nl
     depends_on:
       gluetun-nl:
@@ -817,7 +817,7 @@ services:
     - SOULSYNC_CONFIG_PATH=/app/config/config.json
     networks:
     - traefik
-    image: boulderbadgedad/soulsync:latest
+    image: boulderbadgedad/soulsync:2.8.3
     extra_hosts:
     - host.docker.internal:host-gateway
     deploy:
@@ -865,7 +865,7 @@ services:
     - EXTERNAL_ADDRESS=https://quasarr.${ARR_DOMAIN}
     networks:
     - traefik
-    image: ghcr.io/rix1337/quasarr:latest
+    image: ghcr.io/rix1337/quasarr:latest@sha256:747f188b174140ac635c0575dcc4f5d68ca8c814be4951dc846bbca8aaf06466
     labels:
     - traefik.enable=true
     - traefik.constraint=proxy-public
@@ -899,7 +899,7 @@ services:
     - CRON_RUN_ON_START=true
     networks:
     - traefik
-    image: ghcr.io/jmbannon/ytdl-sub:latest
+    image: ghcr.io/jmbannon/ytdl-sub:2026.07.17.post1
     healthcheck:
       test:
       - CMD-SHELL
@@ -922,7 +922,7 @@ services:
     - TZ=${TZ}
     - KOMETA_CONFIG=/config/config.yml
     - KOMETA_TIMES=${KOMETA_TIMES:-03:30}
-    image: lscr.io/linuxserver/kometa:latest
+    image: lscr.io/linuxserver/kometa:v2.4.6-ls110
     healthcheck:
       test:
       - CMD-SHELL
@@ -935,7 +935,7 @@ services:
     - ${FAST_ROOT}/mediarr_data/kometa/config:/config
     container_name: arr-kometa
   gluetun-nl:
-    image: qmcgaw/gluetun
+    image: qmcgaw/gluetun:latest@sha256:b0ee2135e6ba52ad3f102aae9663707cd1c9531485117067a380d3b2b6dd991d
     cap_add:
     - NET_ADMIN
     devices:
