@@ -1,0 +1,48 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "timezone": "Europe/Berlin",
+  "schedule": ["* 2-5 * * 1"],
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 0,
+  "labels": ["docker-update"],
+  "commitMessagePrefix": "chore(deps):",
+  "packageRules": [
+    {
+      "description": "Tier 2 (Standard): zustandslose Dienste. Patch, Minor und Digest laufen automatisch durch - ein Fehlschlag wird vom Health-Gate in deploy-stack.sh erkannt und zurueckgerollt.",
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "automerge": true,
+      "minimumReleaseAge": "3 days"
+    },
+    {
+      "description": "Major-Updates nie automatisch - dort stecken die Breaking Changes.",
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "minimumReleaseAge": "7 days",
+      "labels": ["docker-update", "major"]
+    },
+    {
+      "description": "Tier 1: eigene Datenbank mit Schema-Migrationen. Nur PR, kein Automerge - ein Image-Rollback holt eine migrierte Datenbank nicht zurueck. Auf automerge=true umstellen, sobald wieder Backups laufen.",
+      "matchPackageNames": [
+        "ghcr.io/seerr-team/seerr",
+        "ghcr.io/maintainerr/maintainerr"
+      ],
+      "automerge": false,
+      "minimumReleaseAge": "5 days",
+      "labels": ["docker-update", "tier1-daten"]
+    },
+    {
+      "description": "Tier 0: Ausfall legt Netzwerk oder Daten lahm. Immer manuell, im Wartungsfenster.",
+      "matchPackageNames": [
+        "postgres",
+        "docker.io/library/postgres",
+        "qmcgaw/gluetun",
+        "tailscale/tailscale",
+        "dpage/pgadmin4"
+      ],
+      "automerge": false,
+      "minimumReleaseAge": "7 days",
+      "labels": ["docker-update", "tier0-kritisch"]
+    }
+  ]
+}
