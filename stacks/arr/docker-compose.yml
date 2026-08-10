@@ -183,7 +183,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
+    restart: always
     container_name: arr-postgres
   pgadmin-arr:
     restart: always
@@ -345,7 +345,11 @@ services:
     - PGID=${PGID}
     - TZ=${TZ}
     image: linuxserver/sabnzbd:latest
-    network_mode: container:vpn-gluetun-nl
+    network_mode: service:gluetun-nl
+    depends_on:
+      gluetun-nl:
+        condition: service_healthy
+        restart: true
     volumes:
     - ${SLOW_ROOT}/media:/mnt/media
     - /mnt/fast/appdata/downloads:/mnt/downloads
@@ -392,7 +396,7 @@ services:
     - ${FAST_ROOT}/mediarr_data/tautulli/config:/config
     container_name: arr-tautulli
   tdarr:
-    restart: always
+    restart: "no"
     devices:
     - /dev/dri/card0:/dev/dri/card0
     - /dev/dri/renderD128:/dev/dri/renderD128
@@ -621,7 +625,11 @@ services:
     - DOWNLOAD_COMPLETE_PATH=/mnt/downloads/mediathek/complete
     - CATEGORIES=tv,movies
     - MEDIATHEKARR_API_BASE_URL=https://mediathekarr.pcjones.de/api/v1
-    network_mode: container:vpn-tailscale-unesty
+    network_mode: service:tailscale-unesty
+    depends_on:
+      tailscale-unesty:
+        condition: service_healthy
+        restart: true
     image: pcjones/mediathekarr:beta
     healthcheck:
       test:
@@ -675,7 +683,11 @@ services:
     - WEBUI_PORT=8081
     - TORRENTING_PORT=6881
     image: lscr.io/linuxserver/qbittorrent:latest
-    network_mode: container:vpn-gluetun-nl
+    network_mode: service:gluetun-nl
+    depends_on:
+      gluetun-nl:
+        condition: service_healthy
+        restart: true
     healthcheck:
       test:
       - CMD-SHELL
@@ -776,7 +788,11 @@ services:
     - ASPNETCORE_URLS=http://0.0.0.0:5030
     - SLSKD_REMOTE_CONFIGURATION=true
     image: slskd/slskd
-    network_mode: container:vpn-gluetun-nl
+    network_mode: service:gluetun-nl
+    depends_on:
+      gluetun-nl:
+        condition: service_healthy
+        restart: true
     healthcheck:
       test:
       - CMD-SHELL
@@ -831,6 +847,7 @@ services:
       retries: 5
       start_period: 40s
     volumes:
+    - ${FAST_ROOT}/mediarr_data/soulsync/scripts:/app/scripts
     - ${FAST_ROOT}/mediarr_data/soulsync/config:/app/config
     - ${FAST_ROOT}/mediarr_data/soulsync/logs:/app/logs
     - ${FAST_ROOT}/mediarr_data/soulsync/staging:/app/Staging
@@ -870,7 +887,7 @@ services:
     - ${FAST_ROOT}/mediarr_data/quasarr/config:/config
     container_name: arr-quasarr
   ytdl-sub:
-    restart: unless-stopped
+    restart: always
     environment:
     - PUID=${PUID}
     - PGID=${PGID}
@@ -879,6 +896,7 @@ services:
     - DEFAULT_WORKSPACE=/config/ytdl-sub-configs
     - UPDATE_YT_DLP_ON_START=stable
     - CRON_SCHEDULE=0 */6 * * *
+    - CRON_RUN_ON_START=true
     networks:
     - traefik
     image: ghcr.io/jmbannon/ytdl-sub:latest
@@ -896,6 +914,110 @@ services:
     - /mnt/fast/media/youtube:/tv_shows
     - /mnt/fast/media/music_videos:/music_videos
     container_name: arr-ytdl-sub
+  kometa:
+    restart: always
+    environment:
+    - PUID=${PUID}
+    - PGID=${PGID}
+    - TZ=${TZ}
+    - KOMETA_CONFIG=/config/config.yml
+    - KOMETA_TIMES=${KOMETA_TIMES:-03:30}
+    image: lscr.io/linuxserver/kometa:latest
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pgrep -f '[s]6-svscan' >/dev/null || exit 1
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    volumes:
+    - ${FAST_ROOT}/mediarr_data/kometa/config:/config
+    container_name: arr-kometa
+  gluetun-nl:
+    image: qmcgaw/gluetun
+    cap_add:
+    - NET_ADMIN
+    devices:
+    - /dev/net/tun:/dev/net/tun
+    networks:
+    - traefik
+    volumes:
+    - /mnt/fast/appdata/vpn_data/gluetun-nl:/gluetun
+    environment:
+    - VPN_SERVICE_PROVIDER=custom
+    - VPN_TYPE=wireguard
+    - WIREGUARD_PRIVATE_KEY=${WIREGUARD_NL_PRIVATE_KEY}
+    - WIREGUARD_ADDRESSES=${WIREGUARD_NL_ADDRESS}
+    - WIREGUARD_PUBLIC_KEY=${WIREGUARD_PEER_PUBLIC_KEY}
+    - WIREGUARD_ENDPOINT_IP=${WIREGUARD_NL_ENDPOINT_IP}
+    - WIREGUARD_ENDPOINT_PORT=${WIREGUARD_ENDPOINT_PORT}
+    - DNS_UPSTREAM_PLAIN_ADDRESSES=${WIREGUARD_DNS}
+    - FIREWALL_INPUT_PORTS=8080,8081,5030
+    - HTTP_CONTROL_SERVER_AUTH_DEFAULT_ROLE={"auth":"apikey","apikey":"${GLUETUN_NL_CONTROL_API_KEY}"}
+    - HTTPPROXY=on
+    - SHADOWSOCKS=on
+    labels:
+    - traefik.enable=true
+    - traefik.constraint=proxy-public
+    - traefik.docker.network=traefik
+    - traefik.http.routers.sabnzbd.rule=Host(`sabnzbd.hartig.es`)
+    - traefik.http.routers.sabnzbd.entrypoints=https
+    - traefik.http.routers.sabnzbd.tls=true
+    - traefik.http.routers.sabnzbd.middlewares=authentik@docker
+    - traefik.http.routers.sabnzbd.service=sabnzbd
+    - traefik.http.services.sabnzbd.loadbalancer.server.port=8080
+    - traefik.http.routers.qbittorrent.rule=Host(`qbittorrent.hartig.es`)
+    - traefik.http.routers.qbittorrent.entrypoints=https
+    - traefik.http.routers.qbittorrent.tls=true
+    - traefik.http.routers.qbittorrent.middlewares=authentik@docker
+    - traefik.http.routers.qbittorrent.service=qbittorrent
+    - traefik.http.services.qbittorrent.loadbalancer.server.port=8081
+    - traefik.http.routers.slskd.rule=Host(`slskd.hartig.es`)
+    - traefik.http.routers.slskd.entrypoints=https
+    - traefik.http.routers.slskd.tls=true
+    - traefik.http.routers.slskd.middlewares=authentik@docker
+    - traefik.http.routers.slskd.service=slskd
+    - traefik.http.services.slskd.loadbalancer.server.port=5030
+    healthcheck:
+      disable: false
+    restart: always
+    container_name: vpn-gluetun-nl
+  tailscale-unesty:
+    image: tailscale/tailscale:stable
+    cap_add:
+    - NET_ADMIN
+    devices:
+    - /dev/net/tun:/dev/net/tun
+    networks:
+    - traefik
+    volumes:
+    - /mnt/fast/appdata/vpn_data/tailscale-unesty/state:/var/lib/tailscale
+    environment:
+    - TS_AUTHKEY=${TAILSCALE_AUTHKEY}
+    - TS_STATE_DIR=/var/lib/tailscale
+    - TS_USERSPACE=false
+    - TS_EXTRA_ARGS=--hostname=vpn-tailscale-unesty --exit-node=100.117.152.83 --exit-node-allow-lan-access=true --accept-routes=true --accept-dns=false
+    labels:
+    - traefik.enable=true
+    - traefik.constraint=proxy-public
+    - traefik.docker.network=traefik
+    - traefik.http.routers.mediathekarr.rule=Host(`mediathekarr.hartig.es`)
+    - traefik.http.routers.mediathekarr.entrypoints=https
+    - traefik.http.routers.mediathekarr.tls=true
+    - traefik.http.routers.mediathekarr.middlewares=authentik@docker
+    - traefik.http.routers.mediathekarr.service=mediathekarr
+    - traefik.http.services.mediathekarr.loadbalancer.server.port=5007
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - tailscale status >/dev/null 2>&1
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: always
+    container_name: vpn-tailscale-unesty
 networks:
   traefik:
     external: true
