@@ -396,6 +396,11 @@ services:
     - ${FAST_ROOT}/mediarr_data/tautulli/config:/config
     container_name: arr-tautulli
   tdarr:
+    # Bewusst abgeschaltet. Das Profil sorgt dafuer, dass "docker compose up -d"
+    # den Dienst nicht wieder mitstartet - die Restart-Policy allein reicht dafuer
+    # nicht. Zum Starten: docker compose --profile disabled up -d tdarr
+    profiles:
+    - disabled
     restart: "no"
     devices:
     - /dev/dri/card0:/dev/dri/card0
