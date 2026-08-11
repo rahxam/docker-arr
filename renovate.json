@@ -15,24 +15,18 @@
       "minimumReleaseAge": "3 days"
     },
     {
-      "description": "Major-Updates nie automatisch - dort stecken die Breaking Changes.",
-      "matchUpdateTypes": ["major"],
-      "automerge": false,
-      "minimumReleaseAge": "7 days",
-      "labels": ["docker-update", "major"]
-    },
-    {
-      "description": "Tier 1: eigene Datenbank mit Schema-Migrationen. Nur PR, kein Automerge - ein Image-Rollback holt eine migrierte Datenbank nicht zurueck. Auf automerge=true umstellen, sobald wieder Backups laufen.",
+      "description": "Tier 1: eigene Datenbank mit Schema-Migrationen. Automerge ist hier erst moeglich, seit deploy-stack.sh vor jedem Update einen Dump zieht und ihn im Rollback wieder einspielt - ohne den waere ein Update nicht umkehrbar. Etwas laengere Reifezeit als Tier 2.",
       "matchPackageNames": [
         "ghcr.io/seerr-team/seerr",
         "ghcr.io/maintainerr/maintainerr"
       ],
-      "automerge": false,
+      "matchUpdateTypes": ["minor", "patch", "digest"],
+      "automerge": true,
       "minimumReleaseAge": "5 days",
       "labels": ["docker-update", "tier1-daten"]
     },
     {
-      "description": "Tier 0: Ausfall legt Netzwerk oder Daten lahm. Immer manuell, im Wartungsfenster.",
+      "description": "Tier 0: Ausfall legt Netzwerk oder Daten lahm. Immer manuell, im Wartungsfenster. Gluetun und Tailscale stellen ausserdem den Netzwerk-Namespace fuer sabnzbd, qbittorrent, slskd und mediathekarr.",
       "matchPackageNames": [
         "postgres",
         "docker.io/library/postgres",
@@ -43,6 +37,13 @@
       "automerge": false,
       "minimumReleaseAge": "7 days",
       "labels": ["docker-update", "tier0-kritisch"]
+    },
+    {
+      "description": "Major-Updates nie automatisch - dort stecken die Breaking Changes. Diese Regel steht bewusst zuletzt: in Renovate gewinnt die spaetere Regel, damit kann keine Tier-Regel darueber sie versehentlich aushebeln.",
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "minimumReleaseAge": "7 days",
+      "labels": ["docker-update", "major"]
     }
   ]
 }

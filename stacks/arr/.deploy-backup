@@ -1,0 +1,3 @@
+# Postgres (arr-postgres) wird automatisch erkannt. Hier die SQLite-Dienste:
+sqlite /mnt/fast/appdata/mediarr_data/seerr/config/db/db.sqlite3
+sqlite /mnt/fast/appdata/mediarr_data/maintainerr/data/maintainerr.sqlite
